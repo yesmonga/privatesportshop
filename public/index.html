@@ -266,6 +266,21 @@
       font-weight: 600;
     }
 
+    .product-info .out-of-stock-badge {
+      background: rgba(255, 152, 0, 0.2);
+      color: #ff9800;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .monitored-product.out-of-stock-product {
+      border-left: 3px solid #ff9800;
+    }
+
     .section-label {
       font-size: 11px;
       color: rgba(255, 255, 255, 0.5);
@@ -630,6 +645,7 @@ Cookie: access_token=...; refresh_token=...
 
     function displayProductPreview(data) {
       const info = data.productInfo;
+      const hasSizes = data.hasSizes && data.sizes.length > 0;
       
       document.getElementById('productInfo').innerHTML = `
         <div class="brand">${info.brand || 'PSS'}</div>
@@ -639,16 +655,30 @@ Cookie: access_token=...; refresh_token=...
           ${info.originalPrice ? `<span class="original-price">${info.originalPrice}</span>` : ''}
           ${info.discount ? `<span class="discount">-${info.discount}</span>` : ''}
         </div>
+        ${!hasSizes ? '<div class="out-of-stock-badge">⚠️ Rupture de stock</div>' : ''}
       `;
 
       const sizesList = document.getElementById('sizesList');
-      sizesList.innerHTML = data.sizes.map(size => `
-        <button class="size-btn ${size.stock?.inStock ? '' : 'out-of-stock'}" 
-                data-size-id="${size.sizeId}"
-                onclick="toggleSize('${size.sizeId}')">
-          ${size.size}
-        </button>
-      `).join('');
+      const sizesLabel = document.querySelector('.section-label');
+      const addBtn = document.getElementById('addBtn');
+      
+      if (hasSizes) {
+        sizesLabel.textContent = 'SÉLECTIONNER LES TAILLES À SURVEILLER';
+        sizesList.innerHTML = data.sizes.map(size => `
+          <button class="size-btn ${size.stock?.inStock ? '' : 'out-of-stock'}" 
+                  data-size-id="${size.sizeId}"
+                  onclick="toggleSize('${size.sizeId}')">
+            ${size.size}
+          </button>
+        `).join('');
+        addBtn.textContent = 'AJOUTER AU MONITORING';
+        addBtn.onclick = addProduct;
+      } else {
+        sizesLabel.textContent = 'AUCUNE TAILLE DISPONIBLE';
+        sizesList.innerHTML = '<p style="color: #ff9800; text-align: center; padding: 10px;">Ce produit est en rupture de stock. Surveillez-le pour être notifié dès son retour !</p>';
+        addBtn.textContent = '🔔 SURVEILLER LE RESTOCK';
+        addBtn.onclick = addProductWatchAll;
+      }
 
       document.getElementById('productPreview').classList.add('visible');
     }
@@ -704,6 +734,41 @@ Cookie: access_token=...; refresh_token=...
       }
     }
 
+    async function addProductWatchAll() {
+      document.getElementById('addBtn').disabled = true;
+
+      try {
+        const response = await fetch('/api/products/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: currentProduct.productId,
+            watchAll: true
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Erreur');
+        }
+
+        showToast(`🔔 Surveillance du restock activée !`);
+        document.getElementById('productPreview').classList.remove('visible');
+        document.getElementById('productUrl').value = '';
+        document.getElementById('productId').value = '';
+        currentProduct = null;
+        selectedSizes.clear();
+        loadMonitoredProducts();
+        loadHistory();
+        
+      } catch (error) {
+        showToast(error.message, true);
+      } finally {
+        document.getElementById('addBtn').disabled = false;
+      }
+    }
+
     async function loadMonitoredProducts() {
       try {
         const response = await fetch('/api/products');
@@ -735,12 +800,17 @@ Cookie: access_token=...; refresh_token=...
         }
 
         container.innerHTML = data.products.map(product => {
-          const watchedSizesStr = product.watchedSizes
-            .map(id => product.sizeMapping[id]?.size || id)
-            .join(', ');
+          const isWatchAll = product.watchAll;
+          const watchedSizesStr = isWatchAll 
+            ? '🔔 Surveillance restock (toutes tailles)'
+            : product.watchedSizes.map(id => product.sizeMapping[id]?.size || id).join(', ') || 'Aucune';
+          
+          const stockStatus = isWatchAll 
+            ? (product.hadSizes ? '✅ En stock' : '⚠️ Rupture') 
+            : '';
 
           return `
-            <div class="monitored-product">
+            <div class="monitored-product ${isWatchAll && !product.hadSizes ? 'out-of-stock-product' : ''}">
               <div class="brand">${product.productInfo.brand || 'PSS'}</div>
               <h4>${product.productInfo.title}</h4>
               <div class="info-row">
@@ -752,8 +822,9 @@ Cookie: access_token=...; refresh_token=...
                   <span class="info-label">Prix</span>
                   <span>${product.productInfo.price || 'N/A'}</span>
                 </div>
+                ${stockStatus ? `<div class="info-item"><span class="info-label">État</span><span>${stockStatus}</span></div>` : ''}
               </div>
-              <div class="sizes">Tailles surveillées: ${watchedSizesStr}</div>
+              <div class="sizes">${isWatchAll ? watchedSizesStr : 'Tailles surveillées: ' + watchedSizesStr}</div>
               <div class="actions">
                 <button class="btn btn-secondary" onclick="resetProduct('${product.key}')">Reset</button>
                 <button class="btn btn-danger" onclick="removeProduct('${product.key}')">Supprimer</button>
