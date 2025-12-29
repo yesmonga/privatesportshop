@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PSS Stock Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #ffffff;
+      padding: 20px;
+      padding-bottom: 40px;
+    }
+
+    .header {
+      text-align: center;
+      padding: 24px 0;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: 700;
+      color: #ff6b35;
+      letter-spacing: -1px;
+    }
+
+    .logo span {
+      color: #ffffff;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 4px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      font-size: 12px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff6b6b;
+    }
+
+    .status-dot.active {
+      background: #4ade80;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #ff6b35;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #ffffff;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.3s ease;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #ff6b35;
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.3s ease;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: #ff6b35;
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: #ff8555;
+    }
+
+    .btn-success {
+      background: #4ade80;
+      color: #0a0a0a;
+    }
+
+    .btn-danger {
+      background: transparent;
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 107, 107, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 107, 107, 0.1);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .or-divider {
+      text-align: center;
+      margin: 20px 0;
+      position: relative;
+    }
+
+    .or-divider::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .or-divider span {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0 16px;
+      position: relative;
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .product-preview {
+      display: none;
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .product-preview.visible {
+      display: block;
+    }
+
+    .product-info {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .product-info .brand {
+      font-size: 10px;
+      color: #ff6b35;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    .product-info h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .product-info .price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .product-info .price {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ff6b35;
+    }
+
+    .product-info .original-price {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.4);
+      text-decoration: line-through;
+    }
+
+    .product-info .discount {
+      font-size: 12px;
+      color: #4ade80;
+      font-weight: 600;
+    }
+
+    .section-label {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .sizes-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .size-btn {
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .size-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .size-btn.selected {
+      background: #ff6b35;
+      border-color: #ff6b35;
+      color: #ffffff;
+    }
+
+    .size-btn.out-of-stock {
+      opacity: 0.4;
+      text-decoration: line-through;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loading.visible {
+      display: block;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255, 107, 53, 0.2);
+      border-top-color: #ff6b35;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.8);
+      margin: 24px 0 12px;
+      padding-left: 4px;
+    }
+
+    .monitored-products, .history-products {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .monitored-product {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .monitored-product.currently-monitored {
+      border-color: rgba(74, 222, 128, 0.3);
+      background: rgba(74, 222, 128, 0.05);
+    }
+
+    .monitored-product .brand {
+      font-size: 10px;
+      color: #ff6b35;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .monitored-product h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .monitored-product .info-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .monitored-product .info-item {
+      flex: 1;
+    }
+
+    .monitored-product .info-label {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .monitored-product .info-item span:last-child {
+      font-size: 13px;
+      color: #ffffff;
+    }
+
+    .monitored-product .sizes {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 12px;
+    }
+
+    .monitored-product .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .monitored-product .actions .btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 11px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #333;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .toast.visible {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .toast.error {
+      background: #dc2626;
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 16px 0;
+    }
+
+    .token-section summary {
+      cursor: pointer;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.6);
+      padding: 8px 0;
+    }
+
+    .token-status {
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">Private<span>SportShop</span></div>
+    <div class="subtitle">Stock Monitor</div>
+    <div class="status" id="monitorStatus">
+      <span class="status-dot"></span>
+      <span>Chargement...</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ajouter un produit</h2>
+    
+    <div class="form-group">
+      <label>URL du produit</label>
+      <input type="text" id="productUrl" placeholder="https://www.privatesportshop.fr/catalog/product/view/id/3158263">
+    </div>
+
+    <div class="or-divider"><span>ou</span></div>
+    
+    <div class="form-group">
+      <label>ID du produit</label>
+      <input type="text" id="productId" placeholder="3158263" inputmode="numeric">
+    </div>
+    
+    <button class="btn btn-primary" id="fetchBtn" onclick="fetchProduct()">
+      Rechercher
+    </button>
+
+    <div class="loading" id="fetchLoading">
+      <div class="spinner"></div>
+      <div class="loading-text">Recherche en cours...</div>
+    </div>
+
+    <div class="product-preview" id="productPreview">
+      <div class="product-info" id="productInfo"></div>
+      
+      <div class="section-label">Sélectionner les tailles à surveiller</div>
+      <div class="sizes-list" id="sizesList"></div>
+      
+      <button class="btn btn-success" id="addBtn" onclick="addProduct()">
+        Ajouter au monitoring
+      </button>
+    </div>
+  </div>
+
+  <div class="section-title">Produits surveillés</div>
+  <div class="monitored-products" id="monitoredProducts">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">🏃</div>
+      <p>Aucun produit surveillé</p>
+    </div>
+  </div>
+
+  <div class="section-title">Historique</div>
+  <div class="history-products" id="historyProducts">
+    <div class="empty-state">
+      <div class="icon">📋</div>
+      <p>Aucun historique</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 24px;">
+    <details class="token-section">
+      <summary>Paramètres d'authentification</summary>
+      
+      <div class="token-status" id="tokenStatus"></div>
+      
+      <div class="form-group" style="margin-top: 12px;">
+        <label>Basic Auth (Base64)</label>
+        <input type="text" id="basicAuthInput" placeholder="MjQ3MDY3ODg6TnJwOHlF...">
+      </div>
+      
+      <div class="form-group">
+        <label>Cookies</label>
+        <textarea id="cookiesInput" placeholder="access_token=...; refresh_token=...; ..." style="height: 80px;"></textarea>
+      </div>
+      
+      <button class="btn btn-primary" onclick="updateAuth()" style="margin-bottom: 12px;">
+        Mettre à jour l'auth
+      </button>
+      
+      <div class="divider"></div>
+      
+      <div class="form-group">
+        <label>Discord Webhook</label>
+        <input type="text" id="discordInput" placeholder="https://discord.com/api/webhooks/...">
+      </div>
+      
+      <button class="btn btn-secondary" onclick="updateDiscord()">
+        Configurer Discord
+      </button>
+    </details>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let currentProduct = null;
+    let selectedSizes = new Set();
+
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast visible' + (isError ? ' error' : '');
+      setTimeout(() => toast.className = 'toast', 3000);
+    }
+
+    function parseUrl() {
+      const url = document.getElementById('productUrl').value.trim();
+      if (url) {
+        const match = url.match(/\/id\/(\d+)/);
+        if (match) {
+          document.getElementById('productId').value = match[1];
+        }
+      }
+    }
+
+    document.getElementById('productUrl').addEventListener('input', parseUrl);
+
+    async function fetchProduct() {
+      const url = document.getElementById('productUrl').value.trim();
+      const productId = document.getElementById('productId').value.trim();
+
+      if (!url && !productId) {
+        showToast('Veuillez entrer une URL ou un ID produit', true);
+        return;
+      }
+
+      document.getElementById('fetchBtn').disabled = true;
+      document.getElementById('fetchLoading').classList.add('visible');
+      document.getElementById('productPreview').classList.remove('visible');
+
+      try {
+        const response = await fetch('/api/products/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, productId })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Erreur lors de la recherche');
+        }
+
+        currentProduct = data;
+        selectedSizes.clear();
+        displayProductPreview(data);
+        
+      } catch (error) {
+        showToast(error.message, true);
+      } finally {
+        document.getElementById('fetchBtn').disabled = false;
+        document.getElementById('fetchLoading').classList.remove('visible');
+      }
+    }
+
+    function displayProductPreview(data) {
+      const info = data.productInfo;
+      
+      document.getElementById('productInfo').innerHTML = `
+        <div class="brand">${info.brand || 'PSS'}</div>
+        <h3>${info.title}</h3>
+        <div class="price-row">
+          <span class="price">${info.price || 'N/A'}</span>
+          ${info.originalPrice ? `<span class="original-price">${info.originalPrice}</span>` : ''}
+          ${info.discount ? `<span class="discount">-${info.discount}</span>` : ''}
+        </div>
+      `;
+
+      const sizesList = document.getElementById('sizesList');
+      sizesList.innerHTML = data.sizes.map(size => `
+        <button class="size-btn ${size.stock?.inStock ? '' : 'out-of-stock'}" 
+                data-size-id="${size.sizeId}"
+                onclick="toggleSize('${size.sizeId}')">
+          ${size.size}
+        </button>
+      `).join('');
+
+      document.getElementById('productPreview').classList.add('visible');
+    }
+
+    function toggleSize(sizeId) {
+      const btn = document.querySelector(`[data-size-id="${sizeId}"]`);
+      if (selectedSizes.has(sizeId)) {
+        selectedSizes.delete(sizeId);
+        btn.classList.remove('selected');
+      } else {
+        selectedSizes.add(sizeId);
+        btn.classList.add('selected');
+      }
+    }
+
+    async function addProduct() {
+      if (selectedSizes.size === 0) {
+        showToast('Sélectionnez au moins une taille', true);
+        return;
+      }
+
+      document.getElementById('addBtn').disabled = true;
+
+      try {
+        const response = await fetch('/api/products/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: currentProduct.productId,
+            watchedSizes: Array.from(selectedSizes)
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Erreur');
+        }
+
+        showToast(`Monitoring ${data.watchedSizes.join(', ')}`);
+        document.getElementById('productPreview').classList.remove('visible');
+        document.getElementById('productUrl').value = '';
+        document.getElementById('productId').value = '';
+        currentProduct = null;
+        selectedSizes.clear();
+        loadMonitoredProducts();
+        loadHistory();
+        
+      } catch (error) {
+        showToast(error.message, true);
+      } finally {
+        document.getElementById('addBtn').disabled = false;
+      }
+    }
+
+    async function loadMonitoredProducts() {
+      try {
+        const response = await fetch('/api/products');
+        const data = await response.json();
+
+        const container = document.getElementById('monitoredProducts');
+        const statusEl = document.getElementById('monitorStatus');
+
+        if (data.isMonitoring) {
+          statusEl.innerHTML = `
+            <span class="status-dot active"></span>
+            <span>Monitoring ${data.products.length} produit(s)</span>
+          `;
+        } else {
+          statusEl.innerHTML = `
+            <span class="status-dot"></span>
+            <span>En attente</span>
+          `;
+        }
+
+        if (data.products.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="icon">🏃</div>
+              <p>Aucun produit surveillé</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = data.products.map(product => {
+          const watchedSizesStr = product.watchedSizes
+            .map(id => product.sizeMapping[id]?.size || id)
+            .join(', ');
+
+          return `
+            <div class="monitored-product">
+              <div class="brand">${product.productInfo.brand || 'PSS'}</div>
+              <h4>${product.productInfo.title}</h4>
+              <div class="info-row">
+                <div class="info-item">
+                  <span class="info-label">ID</span>
+                  <span>${product.productId}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Prix</span>
+                  <span>${product.productInfo.price || 'N/A'}</span>
+                </div>
+              </div>
+              <div class="sizes">Tailles surveillées: ${watchedSizesStr}</div>
+              <div class="actions">
+                <button class="btn btn-secondary" onclick="resetProduct('${product.key}')">Reset</button>
+                <button class="btn btn-danger" onclick="removeProduct('${product.key}')">Supprimer</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (error) {
+        console.error('Error loading products:', error);
+      }
+    }
+
+    async function removeProduct(key) {
+      try {
+        await fetch(`/api/products/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        showToast('Produit supprimé');
+        loadMonitoredProducts();
+        loadHistory();
+      } catch (error) {
+        showToast('Erreur lors de la suppression', true);
+      }
+    }
+
+    async function resetProduct(key) {
+      try {
+        await fetch(`/api/products/${encodeURIComponent(key)}/reset`, { method: 'POST' });
+        showToast('Notifications réinitialisées');
+        loadMonitoredProducts();
+      } catch (error) {
+        showToast('Erreur lors du reset', true);
+      }
+    }
+
+    async function updateAuth() {
+      const basicAuth = document.getElementById('basicAuthInput').value.trim();
+      const cookies = document.getElementById('cookiesInput').value.trim();
+
+      if (!basicAuth && !cookies) {
+        showToast('Entrez au moins un paramètre', true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/config/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ basicAuth, cookies })
+        });
+
+        if (response.ok) {
+          showToast('Auth mis à jour');
+          document.getElementById('basicAuthInput').value = '';
+          document.getElementById('cookiesInput').value = '';
+          updateTokenStatus();
+        } else {
+          throw new Error('Erreur');
+        }
+      } catch (error) {
+        showToast('Erreur lors de la mise à jour', true);
+      }
+    }
+
+    async function updateDiscord() {
+      const webhook = document.getElementById('discordInput').value.trim();
+
+      if (!webhook) {
+        showToast('Entrez l\'URL du webhook', true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/config/discord', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ webhook })
+        });
+
+        if (response.ok) {
+          showToast('Discord configuré');
+          document.getElementById('discordInput').value = '';
+          updateTokenStatus();
+        } else {
+          throw new Error('Erreur');
+        }
+      } catch (error) {
+        showToast('Erreur lors de la configuration', true);
+      }
+    }
+
+    async function updateTokenStatus() {
+      try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        
+        const statusEl = document.getElementById('tokenStatus');
+        let html = '';
+
+        if (data.hasAuth) {
+          html += `
+            <div style="background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+              <div style="color: #4ade80; font-weight: 500; font-size: 12px;">✅ Auth configuré</div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div style="background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+              <div style="color: #ff6b6b; font-weight: 500; font-size: 12px;">⚠️ Auth non configuré</div>
+            </div>
+          `;
+        }
+
+        if (data.hasDiscord) {
+          html += `
+            <div style="background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 8px; padding: 12px;">
+              <div style="color: #4ade80; font-weight: 500; font-size: 12px;">✅ Discord configuré</div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 12px;">
+              <div style="color: #fbbf24; font-weight: 500; font-size: 12px;">⚠️ Discord non configuré</div>
+            </div>
+          `;
+        }
+
+        statusEl.innerHTML = html;
+      } catch (error) {
+        console.error('Error fetching status:', error);
+      }
+    }
+
+    // ============== HISTORY FUNCTIONS ==============
+    
+    async function loadHistory() {
+      try {
+        const response = await fetch('/api/history');
+        const data = await response.json();
+        
+        const container = document.getElementById('historyProducts');
+        
+        if (data.history.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="icon">📋</div>
+              <p>Aucun historique</p>
+            </div>
+          `;
+          return;
+        }
+        
+        container.innerHTML = data.history.map(item => {
+          const sizes = item.sizeMapping ? Object.values(item.sizeMapping).map(s => s.size).join(', ') : '-';
+          const isMonitored = item.isCurrentlyMonitored;
+          
+          return `
+            <div class="monitored-product ${isMonitored ? 'currently-monitored' : ''}">
+              <div class="brand">${item.brand || 'PSS'}</div>
+              <h4>${item.title}</h4>
+              <div class="info-row">
+                <div class="info-item">
+                  <span class="info-label">ID Produit</span>
+                  <span>${item.productId}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Prix</span>
+                  <span>${item.price || '-'}</span>
+                </div>
+              </div>
+              <div class="info-row">
+                <div class="info-item">
+                  <span class="info-label">Remise</span>
+                  <span>${item.discount || '-'}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Tailles</span>
+                  <span>${sizes}</span>
+                </div>
+              </div>
+              ${isMonitored ? `
+                <div style="color: #4ade80; font-size: 12px; margin-top: 8px;">✓ Actuellement surveillé</div>
+              ` : `
+                <div class="actions">
+                  <button class="btn btn-success" onclick="quickSearch('${item.productId}')">Rechercher</button>
+                  <button class="btn btn-danger" onclick="removeFromHistory('${item.key}')">Supprimer</button>
+                </div>
+              `}
+            </div>
+          `;
+        }).join('');
+        
+      } catch (error) {
+        console.error('Error loading history:', error);
+      }
+    }
+    
+    async function quickSearch(productId) {
+      document.getElementById('productId').value = productId;
+      document.getElementById('productUrl').value = '';
+      await fetchProduct();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    async function removeFromHistory(key) {
+      try {
+        await fetch(`/api/history/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        showToast('Supprimé de l\'historique');
+        loadHistory();
+      } catch (error) {
+        showToast('Erreur lors de la suppression', true);
+      }
+    }
+
+    // Initialize
+    loadMonitoredProducts();
+    loadHistory();
+    updateTokenStatus();
+    setInterval(loadMonitoredProducts, 30000);
+    setInterval(loadHistory, 30000);
+    setInterval(updateTokenStatus, 60000);
+  </script>
+</body>
+</html>

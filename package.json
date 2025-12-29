@@ -1,0 +1,12 @@
+{
+  "name": "privatesportshop-monitor",
+  "version": "1.0.0",
+  "description": "PrivateSportShop Stock Monitor with Discord notifications",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
