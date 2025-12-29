@@ -7,16 +7,45 @@ app.use(express.static('public'));
 
 const PORT = process.env.PORT || 3000;
 
+// Parse full HTTP headers to extract Authorization and Cookie
+function parseHeadersFromEnv(headersStr) {
+  const result = { basicAuth: '', cookies: '' };
+  if (!headersStr) return result;
+  
+  const lines = headersStr.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Extract Authorization: Basic ...
+    if (trimmed.toLowerCase().startsWith('authorization:')) {
+      const value = trimmed.substring('authorization:'.length).trim();
+      if (value.toLowerCase().startsWith('basic ')) {
+        result.basicAuth = value.substring('basic '.length).trim();
+      }
+    }
+    
+    // Extract Cookie: ...
+    if (trimmed.toLowerCase().startsWith('cookie:')) {
+      result.cookies = trimmed.substring('cookie:'.length).trim();
+    }
+  }
+  
+  return result;
+}
+
+// Parse headers from PSS_HEADERS env variable
+const parsedHeaders = parseHeadersFromEnv(process.env.PSS_HEADERS);
+
 // Configuration - All sensitive data from environment variables
 const CONFIG = {
   discordWebhook: process.env.DISCORD_WEBHOOK || "",
   checkoutUrl: "https://www.privatesportshop.fr/checkout/cart",
   cartReservationMinutes: 15,
   checkIntervalMs: 60 * 1000,
-  // Basic auth for cart operations (format: "userId:token" base64 encoded)
-  basicAuth: process.env.PSS_BASIC_AUTH || "",
-  // Cookies including access_token
-  cookies: process.env.PSS_COOKIES || "",
+  // Basic auth for cart operations (parsed from headers or direct env)
+  basicAuth: parsedHeaders.basicAuth || process.env.PSS_BASIC_AUTH || "",
+  // Cookies including access_token (parsed from headers or direct env)
+  cookies: parsedHeaders.cookies || process.env.PSS_COOKIES || "",
   storeId: "20",
   shipment: "FR"
 };
@@ -653,8 +682,22 @@ app.delete('/api/history/:key', (req, res) => {
 // ============== CONFIG API ==============
 
 app.post('/api/config/auth', (req, res) => {
-  const { basicAuth, cookies } = req.body;
+  const { headers, basicAuth, cookies } = req.body;
   
+  // If full headers are provided, parse them
+  if (headers) {
+    const parsed = parseHeadersFromEnv(headers);
+    if (parsed.basicAuth) {
+      CONFIG.basicAuth = parsed.basicAuth;
+      console.log(`[${getTimestamp()}] Basic auth updated from headers`);
+    }
+    if (parsed.cookies) {
+      CONFIG.cookies = parsed.cookies;
+      console.log(`[${getTimestamp()}] Cookies updated from headers`);
+    }
+  }
+  
+  // Direct values override parsed ones
   if (basicAuth) {
     CONFIG.basicAuth = basicAuth;
     console.log(`[${getTimestamp()}] Basic auth updated via API`);

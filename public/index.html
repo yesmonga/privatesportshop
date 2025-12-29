@@ -540,13 +540,12 @@
       <div class="token-status" id="tokenStatus"></div>
       
       <div class="form-group" style="margin-top: 12px;">
-        <label>Basic Auth (Base64)</label>
-        <input type="text" id="basicAuthInput" placeholder="MjQ3MDY3ODg6TnJwOHlF...">
-      </div>
-      
-      <div class="form-group">
-        <label>Cookies</label>
-        <textarea id="cookiesInput" placeholder="access_token=...; refresh_token=...; ..." style="height: 80px;"></textarea>
+        <label>Headers complets (copiez depuis Proxyman/Charles)</label>
+        <textarea id="headersInput" placeholder="POST /api/7/v2.0.0/basket/add/ HTTP/1.1
+Host: raven.privatesportshop.fr
+Authorization: Basic MjQ3MDY3ODg6...
+Cookie: access_token=...; refresh_token=...
+..." style="height: 120px;"></textarea>
       </div>
       
       <button class="btn btn-primary" onclick="updateAuth()" style="margin-bottom: 12px;">
@@ -790,11 +789,10 @@
     }
 
     async function updateAuth() {
-      const basicAuth = document.getElementById('basicAuthInput').value.trim();
-      const cookies = document.getElementById('cookiesInput').value.trim();
+      const headers = document.getElementById('headersInput').value.trim();
 
-      if (!basicAuth && !cookies) {
-        showToast('Entrez au moins un paramètre', true);
+      if (!headers) {
+        showToast('Collez les headers complets', true);
         return;
       }
 
@@ -802,13 +800,12 @@
         const response = await fetch('/api/config/auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ basicAuth, cookies })
+          body: JSON.stringify({ headers })
         });
 
         if (response.ok) {
           showToast('Auth mis à jour');
-          document.getElementById('basicAuthInput').value = '';
-          document.getElementById('cookiesInput').value = '';
+          document.getElementById('headersInput').value = '';
           updateTokenStatus();
         } else {
           throw new Error('Erreur');
