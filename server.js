@@ -215,7 +215,10 @@ async function fetchProductDetails(productId) {
     }
   }
 
-  console.log(`[${getTimestamp()}] Found ${Object.keys(sizeMapping).length} sizes for ${productInfo.brand} - ${productInfo.title}`);
+  // Track if product has any stock at all
+  const hasAnySizes = Object.keys(sizeMapping).length > 0;
+  
+  console.log(`[${getTimestamp()}] Found ${Object.keys(sizeMapping).length} sizes for ${productInfo.brand} - ${productInfo.title} (inStock: ${productInfo.inStock}, hasSizes: ${hasAnySizes})`);
   
   return { productInfo, sizeMapping, stockInfo };
 }
@@ -362,8 +365,43 @@ async function monitorAllProducts() {
       const { productInfo, sizeMapping, stockInfo } = await fetchProductDetails(product.productId);
       
       const productUrl = `https://www.privatesportshop.fr/catalog/product/view/id/${product.productId}`;
+      const hasSizes = Object.keys(sizeMapping).length > 0;
 
-      // Check each watched size
+      // WatchAll mode: monitor for ANY stock (for out-of-stock products)
+      if (product.watchAll) {
+        const hadSizesBefore = product.hadSizes;
+        
+        // Product went from no-sizes to having-sizes = BACK IN STOCK!
+        if (!hadSizesBefore && hasSizes) {
+          console.log(`[${getTimestamp()}] 🚨 RESTOCK DETECTED: ${productInfo.brand} - ${productInfo.title} now has ${Object.keys(sizeMapping).length} sizes!`);
+          
+          // Notify for each available size and try to add one to cart
+          let addedToCart = false;
+          for (const [sizeId, sizeInfo] of Object.entries(sizeMapping)) {
+            if (!addedToCart) {
+              const cartResult = await addToCart(product.productId, sizeId);
+              if (cartResult.success) {
+                await sendDiscordNotification(productInfo, sizeId, sizeInfo.size, 1, productUrl);
+                product.notified.add(sizeId);
+                addedToCart = true;
+                console.log(`[${getTimestamp()}] 📢 Discord notification sent for restock!`);
+              }
+            }
+          }
+          
+          // Update hadSizes so we don't notify again
+          product.hadSizes = true;
+        }
+        
+        // Product went from having-sizes to no-sizes = OUT OF STOCK
+        if (hadSizesBefore && !hasSizes) {
+          console.log(`[${getTimestamp()}] ⚠️ ${productInfo.brand} - ${productInfo.title} is now out of stock`);
+          product.hadSizes = false;
+          product.notified.clear(); // Reset so we notify again when back in stock
+        }
+      }
+
+      // Normal mode: Check each watched size
       for (const sizeId of product.watchedSizes) {
         const currentStock = stockInfo[sizeId];
         const previousStock = product.previousStock[sizeId];
@@ -459,6 +497,8 @@ app.get('/api/products', (req, res) => {
       productInfo: product.productInfo,
       sizeMapping: product.sizeMapping,
       watchedSizes: Array.from(product.watchedSizes),
+      watchAll: product.watchAll || false,
+      hadSizes: product.hadSizes,
       currentStock: product.previousStock,
       notified: Array.from(product.notified)
     });
@@ -500,9 +540,13 @@ app.post('/api/products/fetch', async (req, res) => {
 
     const { productInfo, sizeMapping, stockInfo } = await fetchProductDetails(productId);
     
+    const hasSizes = Object.keys(sizeMapping).length > 0;
+    
     res.json({
       productId,
       productInfo,
+      inStock: productInfo.inStock,
+      hasSizes,
       sizes: Object.entries(sizeMapping).map(([sizeId, info]) => ({
         sizeId,
         size: info.size,
@@ -529,10 +573,15 @@ app.post('/api/products/fetch', async (req, res) => {
 // Add product to monitoring
 app.post('/api/products/add', async (req, res) => {
   try {
-    const { productId, watchedSizes } = req.body;
+    const { productId, watchedSizes, watchAll } = req.body;
     
-    if (!productId || !watchedSizes || !Array.isArray(watchedSizes)) {
-      return res.status(400).json({ error: 'Product ID and watchedSizes array are required' });
+    // Allow monitoring without sizes if watchAll is true (for out-of-stock products)
+    if (!productId) {
+      return res.status(400).json({ error: 'Product ID is required' });
+    }
+    
+    if (!watchAll && (!watchedSizes || !Array.isArray(watchedSizes) || watchedSizes.length === 0)) {
+      return res.status(400).json({ error: 'watchedSizes array is required (or set watchAll: true for out-of-stock products)' });
     }
 
     const key = productId.toString();
@@ -541,20 +590,38 @@ app.post('/api/products/add', async (req, res) => {
     
     const notifiedSet = new Set();
     const productUrl = `https://www.privatesportshop.fr/catalog/product/view/id/${productId}`;
+    const hasSizes = Object.keys(sizeMapping).length > 0;
     
-    // Check if any watched size is already in stock
-    for (const sizeId of watchedSizes) {
-      const stock = stockInfo[sizeId];
-      if (stock && stock.inStock) {
-        const sizeName = sizeMapping[sizeId]?.size || sizeId;
-        console.log(`[${getTimestamp()}] 🚨 Size ${sizeName} already in stock - sending notification!`);
-        
-        // Try to add to cart
+    // If watchAll mode and product now has sizes, notify immediately
+    if (watchAll && hasSizes) {
+      console.log(`[${getTimestamp()}] 🚨 Product ${productInfo.brand} - ${productInfo.title} has ${Object.keys(sizeMapping).length} sizes available!`);
+      
+      // Add all available sizes to cart and notify
+      for (const [sizeId, sizeInfo] of Object.entries(sizeMapping)) {
         const cartResult = await addToCart(productId, sizeId);
-        
         if (cartResult.success) {
-          await sendDiscordNotification(productInfo, sizeId, sizeName, stock.quantity || 1, productUrl);
+          await sendDiscordNotification(productInfo, sizeId, sizeInfo.size, 1, productUrl);
           notifiedSet.add(sizeId);
+          break; // Only add one size to cart
+        }
+      }
+    }
+    
+    // Check if any watched size is already in stock (normal mode)
+    if (watchedSizes && watchedSizes.length > 0) {
+      for (const sizeId of watchedSizes) {
+        const stock = stockInfo[sizeId];
+        if (stock && stock.inStock) {
+          const sizeName = sizeMapping[sizeId]?.size || sizeId;
+          console.log(`[${getTimestamp()}] 🚨 Size ${sizeName} already in stock - sending notification!`);
+          
+          // Try to add to cart
+          const cartResult = await addToCart(productId, sizeId);
+          
+          if (cartResult.success) {
+            await sendDiscordNotification(productInfo, sizeId, sizeName, stock.quantity || 1, productUrl);
+            notifiedSet.add(sizeId);
+          }
         }
       }
     }
@@ -563,7 +630,9 @@ app.post('/api/products/add', async (req, res) => {
       productId,
       productInfo,
       sizeMapping,
-      watchedSizes: new Set(watchedSizes),
+      watchedSizes: watchedSizes ? new Set(watchedSizes) : new Set(),
+      watchAll: !!watchAll, // Monitor for ANY stock (for out-of-stock products)
+      hadSizes: hasSizes, // Track if product had sizes when added
       previousStock: stockInfo,
       notified: notifiedSet
     });
@@ -573,10 +642,18 @@ app.post('/api/products/add', async (req, res) => {
 
     startMonitoring();
 
+    const mode = watchAll ? 'watchAll' : 'watchSizes';
+    const message = watchAll 
+      ? `Monitoring ${productInfo.brand} - ${productInfo.title} for ANY stock (currently ${hasSizes ? 'in stock' : 'out of stock'})`
+      : `Now monitoring ${productInfo.brand} - ${productInfo.title}`;
+    
     res.json({ 
       success: true, 
-      message: `Now monitoring ${productInfo.brand} - ${productInfo.title}`,
-      watchedSizes: watchedSizes.map(id => sizeMapping[id]?.size || id),
+      message,
+      mode,
+      inStock: hasSizes,
+      watchedSizes: watchedSizes ? watchedSizes.map(id => sizeMapping[id]?.size || id) : [],
+      availableSizes: Object.entries(sizeMapping).map(([id, info]) => ({ sizeId: id, size: info.size })),
       alreadyInStock: Array.from(notifiedSet).map(id => sizeMapping[id]?.size || id)
     });
   } catch (error) {
